@@ -276,7 +276,7 @@ function initGoogle() {
   }
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: WEB_CLIENT_ID,
-    scope: 'https://www.googleapis.com/auth/drive.file',
+    scope: 'https://www.googleapis.com/auth/drive',
     callback: async (resp) => {
       if (resp.error) { console.error(resp); setSyncStatus(false); return; }
       accessToken = resp.access_token;
