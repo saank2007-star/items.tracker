@@ -261,6 +261,18 @@ let accessToken = null;
 let driveFileId = localStorage.getItem('driveFileId') || null;
 let tokenClient;
 
+function saveToken(token) {
+  localStorage.setItem('gAccessToken', token);
+  localStorage.setItem('gTokenExpiry', Date.now() + 55 * 60 * 1000); // 55 min
+}
+
+function loadSavedToken() {
+  const token = localStorage.getItem('gAccessToken');
+  const expiry = parseInt(localStorage.getItem('gTokenExpiry') || '0');
+  if (token && Date.now() < expiry) return token;
+  return null;
+}
+
 // ===== GOOGLE AUTH =====
 window.onload = () => {
   loadLocal();
@@ -268,9 +280,17 @@ window.onload = () => {
   initGoogle();
 };
 
-function initGoogle() {
+async function initGoogle() {
+  // Use stored token if still valid
+  const saved = loadSavedToken();
+  if (saved) {
+    accessToken = saved;
+    setSyncStatus(true);
+    await loadFromDrive();
+    renderAll();
+  }
+
   if (!window.google) {
-    // GIS not loaded yet — retry
     setTimeout(initGoogle, 500);
     return;
   }
@@ -280,13 +300,17 @@ function initGoogle() {
     callback: async (resp) => {
       if (resp.error) { console.error(resp); setSyncStatus(false); return; }
       accessToken = resp.access_token;
+      saveToken(accessToken);
       setSyncStatus(true);
       await loadFromDrive();
       renderAll();
     },
   });
-  // Try silent sign-in
-  tokenClient.requestAccessToken({ prompt: '' });
+
+  // Only do silent sign-in if we don't already have a valid token
+  if (!saved) {
+    tokenClient.requestAccessToken({ prompt: '' });
+  }
 }
 
 function signIn() {
@@ -306,7 +330,7 @@ async function driveRequest(url, options = {}) {
     ...options,
     headers: { Authorization: `Bearer ${accessToken}`, ...(options.headers || {}) },
   });
-  if (res.status === 401) { accessToken = null; setSyncStatus(false); return null; }
+  if (res.status === 401) { accessToken = null; localStorage.removeItem('gAccessToken'); localStorage.removeItem('gTokenExpiry'); setSyncStatus(false); return null; }
   return res;
 }
 
