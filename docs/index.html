@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black">
+<meta name="apple-mobile-web-app-title" content="Tracker">
+<meta name="theme-color" content="#0f1115">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon.svg">
+<title>Items Tracker</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+body { font-family:'Segoe UI',system-ui,sans-serif; background:#0f1115; color:#e8eaed; min-height:100dvh; padding-bottom:72px; }
+
+/* Header */
+.header { background:#0f1115; border-bottom:1px solid #262a33; padding:14px 16px 10px; position:sticky; top:0; z-index:10; }
+.header h1 { font-size:1.1rem; font-weight:700; background:linear-gradient(90deg,#4ade80,#22d3ee); -webkit-background-clip:text; background-clip:text; color:transparent; }
+.sync-status { font-size:0.72rem; color:#9aa0a6; margin-top:2px; display:flex; align-items:center; gap:6px; }
+.sync-dot { width:6px; height:6px; border-radius:50%; background:#9aa0a6; flex-shrink:0; }
+.sync-dot.green { background:#4ade80; }
+.btn-signin { font-size:0.72rem; background:#4ade80; color:#0f1115; border:none; border-radius:6px; padding:3px 10px; font-weight:700; cursor:pointer; }
+
+/* Bottom nav */
+.bottom-nav { position:fixed; bottom:0; left:0; right:0; background:#181b22; border-top:1px solid #262a33; display:flex; z-index:10; padding-bottom:env(safe-area-inset-bottom); }
+.nav-btn { flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center; padding:10px 4px; border:none; background:none; color:#9aa0a6; font-size:0.62rem; font-weight:600; cursor:pointer; gap:4px; text-transform:uppercase; letter-spacing:0.04em; }
+.nav-btn svg { width:22px; height:22px; }
+.nav-btn.active { color:#4ade80; }
+
+/* Pages */
+.page { display:none; padding:16px; }
+.page.active { display:block; }
+
+/* Stats grid */
+.stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:16px; }
+.stat { background:#181b22; border:1px solid #262a33; border-radius:12px; padding:14px; }
+.stat .label { font-size:0.68rem; text-transform:uppercase; letter-spacing:0.05em; color:#9aa0a6; margin-bottom:4px; }
+.stat .value { font-size:1.3rem; font-weight:700; }
+.stats.three .stat:last-child:nth-child(odd) { grid-column:1/-1; }
+
+/* Cards */
+.card-list { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+.card { background:#181b22; border:1px solid #262a33; border-radius:12px; padding:14px; }
+.card .card-title { font-size:0.95rem; font-weight:600; margin-bottom:4px; }
+.card .card-meta { font-size:0.78rem; color:#9aa0a6; margin-bottom:8px; }
+.card .card-profit { font-size:1rem; font-weight:700; }
+.card .card-actions { display:flex; gap:8px; margin-top:10px; }
+.card .card-actions button { flex:1; padding:7px; border-radius:8px; font-size:0.8rem; font-weight:600; cursor:pointer; border:1px solid; }
+.btn-edit-card { background:transparent; color:#22d3ee; border-color:#1a2e36 !important; }
+.btn-del-card { background:transparent; color:#f87171; border-color:#3a2226 !important; }
+
+/* Form card */
+.form-card { background:#181b22; border:1px solid #262a33; border-radius:12px; padding:16px; margin-bottom:4px; }
+.form-card h2 { font-size:0.78rem; text-transform:uppercase; letter-spacing:0.05em; color:#9aa0a6; margin-bottom:12px; }
+label { display:block; font-size:0.7rem; text-transform:uppercase; letter-spacing:0.05em; color:#9aa0a6; margin-bottom:5px; }
+input[type=text], input[type=number], select {
+  width:100%; padding:12px; background:#0f1115; border:1px solid #2e333d;
+  border-radius:8px; color:#e8eaed; font-size:1rem; margin-bottom:12px;
+}
+input:focus, select:focus { outline:none; border-color:#4ade80; }
+input[type=number] { -moz-appearance:textfield; appearance:textfield; }
+input[type=number]::-webkit-inner-spin-button { -webkit-appearance:none; }
+.sku-hint { font-size:0.75rem; color:#4ade80; margin-top:-8px; margin-bottom:10px; min-height:16px; }
+.sku-err { color:#f87171; }
+
+.btn-primary { width:100%; padding:14px; background:#4ade80; color:#0f1115; border:none; border-radius:10px; font-size:1rem; font-weight:700; cursor:pointer; margin-top:4px; }
+.btn-primary.editing { background:#fbbf24; }
+.btn-cancel-row { display:none; width:100%; padding:11px; background:#262a33; color:#9aa0a6; border:none; border-radius:10px; font-size:0.9rem; font-weight:600; cursor:pointer; margin-top:8px; }
+
+/* Colours */
+.green { color:#4ade80; }
+.red { color:#f87171; }
+.cyan { color:#22d3ee; }
+.amber { color:#fbbf24; }
+.badge { display:inline-block; padding:2px 8px; border-radius:20px; font-size:0.7rem; font-weight:600; }
+.badge-ebay { background:#1e2a3a; color:#60a5fa; }
+.badge-vinted { background:#0f2e2a; color:#2dd4bf; }
+.badge-depop { background:#2a1a2e; color:#e879f9; }
+.badge-cat { background:#2a2415; color:#fbbf24; }
+
+.search-bar { width:100%; padding:11px 12px; background:#181b22; border:1px solid #262a33; border-radius:8px; color:#e8eaed; font-size:0.95rem; margin-bottom:12px; }
+.search-bar:focus { outline:none; border-color:#4ade80; }
+.empty { text-align:center; color:#5f6368; padding:32px 0; font-size:0.9rem; }
+
+/* Summary table */
+.sum-table { width:100%; border-collapse:collapse; font-size:0.8rem; }
+.sum-table th { text-align:left; color:#9aa0a6; font-size:0.65rem; text-transform:uppercase; padding:6px 8px; border-bottom:1px solid #262a33; }
+.sum-table td { padding:8px; border-bottom:1px solid #1e222a; }
+.sum-table td:not(:first-child) { text-align:right; }
+
+.danger-btns { display:flex; flex-direction:column; gap:8px; margin-top:12px; }
+.btn-danger { padding:12px; background:transparent; color:#f87171; border:1px solid #3a2226; border-radius:10px; font-size:0.9rem; font-weight:600; cursor:pointer; }
+.btn-secondary { padding:12px; background:#262a33; color:#e8eaed; border:none; border-radius:10px; font-size:0.9rem; font-weight:600; cursor:pointer; }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>Items Tracker</h1>
+  <div class="sync-status">
+    <span class="sync-dot" id="syncDot"></span>
+    <span id="syncMsg">Not signed in to Google Drive</span>
+    <button class="btn-signin" id="signinBtn" onclick="signIn()" style="display:none">Sign in</button>
+  </div>
+</div>
+
+<!-- ===== SALES PAGE ===== -->
+<div class="page active" id="pageSales">
+  <div class="stats">
+    <div class="stat"><div class="label">Sales This Month</div><div class="value cyan" id="mCount">0</div></div>
+    <div class="stat"><div class="label">Revenue This Month</div><div class="value" id="mRev">£0.00</div></div>
+    <div class="stat"><div class="label">Profit This Month</div><div class="value" id="mProfit">£0.00</div></div>
+    <div class="stat"><div class="label">Profit Today</div><div class="value" id="tProfit">£0.00</div></div>
+  </div>
+
+  <div class="form-card">
+    <h2 id="saleFormTitle">Log a Sale</h2>
+    <label>SKU</label>
+    <input type="text" id="saleSku" placeholder="e.g. FS-001" oninput="skuLookup()" autocapitalize="characters">
+    <div class="sku-hint" id="skuHint"></div>
+    <label>Recipient</label>
+    <input type="text" id="saleRecipient" placeholder="e.g. John Smith">
+    <label>Platform</label>
+    <select id="salePlatform">
+      <option value="eBay">eBay</option>
+      <option value="Vinted">Vinted</option>
+      <option value="Depop">Depop</option>
+    </select>
+    <label>Sold For (£)</label>
+    <input type="number" id="saleSold" placeholder="35.00" step="0.01" min="0" inputmode="decimal">
+    <label>Shipping (£)</label>
+    <input type="number" id="saleShipping" placeholder="3.20" step="0.01" min="0" inputmode="decimal">
+    <button class="btn-primary" id="saleBtn" onclick="addSale()">+ Log Sale</button>
+    <button class="btn-cancel-row" id="cancelSaleBtn" onclick="cancelEditSale()">Cancel</button>
+  </div>
+
+  <input class="search-bar" id="saleSearch" placeholder="Search sales…" oninput="renderSales()">
+  <div class="card-list" id="saleCards"></div>
+  <div class="empty" id="emptySales">No sales yet. Add stock in Inventory first.</div>
+</div>
+
+<!-- ===== INVENTORY PAGE ===== -->
+<div class="page" id="pageInventory">
+  <div class="stats three">
+    <div class="stat"><div class="label">In Stock</div><div class="value cyan" id="invCount">0</div></div>
+    <div class="stat"><div class="label">Stock Value</div><div class="value amber" id="invValue">£0.00</div></div>
+    <div class="stat"><div class="label">All-Time Sold</div><div class="value green" id="invSold">0</div></div>
+  </div>
+
+  <div class="form-card">
+    <h2 id="invFormTitle">Add Stock</h2>
+    <label>Item Name</label>
+    <input type="text" id="invItem" placeholder="e.g. Arsenal 04/05 Home Shirt">
+    <label>SKU</label>
+    <input type="text" id="invSku" placeholder="e.g. FS-001" autocapitalize="characters">
+    <label>Cost Price (£)</label>
+    <input type="number" id="invCost" placeholder="12.50" step="0.01" min="0" inputmode="decimal">
+    <button class="btn-primary" id="invBtn" onclick="addStock()">+ Add Stock</button>
+    <button class="btn-cancel-row" id="cancelInvBtn" onclick="cancelEditInv()">Cancel</button>
+  </div>
+
+  <input class="search-bar" id="invSearch" placeholder="Search inventory…" oninput="renderInventory()">
+  <div class="card-list" id="invCards"></div>
+  <div class="empty" id="emptyInv">No stock yet.</div>
+</div>
+
+<!-- ===== EXPENSES PAGE ===== -->
+<div class="page" id="pageExpenses">
+  <div class="stats three">
+    <div class="stat"><div class="label">Total Logged</div><div class="value cyan" id="expCount">0</div></div>
+    <div class="stat"><div class="label">All-Time Total</div><div class="value amber" id="expTotal">£0.00</div></div>
+    <div class="stat"><div class="label">This Month</div><div class="value" id="expMonth">£0.00</div></div>
+  </div>
+
+  <div class="form-card">
+    <h2 id="expFormTitle">Add Expense</h2>
+    <label>Description</label>
+    <input type="text" id="expDesc" placeholder="e.g. Poly mailers x100">
+    <label>Category</label>
+    <select id="expCat">
+      <option value="Packaging">Packaging</option>
+      <option value="Storage/Lockup">Storage/Lockup</option>
+      <option value="Fuel/Travel">Fuel/Travel</option>
+      <option value="Subscriptions/Tools">Subscriptions/Tools</option>
+      <option value="Equipment">Equipment</option>
+      <option value="Other">Other</option>
+    </select>
+    <label>Amount (£)</label>
+    <input type="number" id="expAmount" placeholder="8.99" step="0.01" min="0" inputmode="decimal">
+    <button class="btn-primary" id="expBtn" onclick="addExpense()">+ Add Expense</button>
+    <button class="btn-cancel-row" id="cancelExpBtn" onclick="cancelEditExpense()">Cancel</button>
+  </div>
+
+  <div class="card-list" id="expCards"></div>
+  <div class="empty" id="emptyExp">No expenses yet.</div>
+</div>
+
+<!-- ===== SUMMARY PAGE ===== -->
+<div class="page" id="pageSummary">
+  <div class="stats">
+    <div class="stat"><div class="label">All-Time Revenue</div><div class="value" id="sumRev">£0.00</div></div>
+    <div class="stat"><div class="label">All-Time Profit</div><div class="value" id="sumProfit">£0.00</div></div>
+    <div class="stat"><div class="label">Items Sold</div><div class="value cyan" id="sumCount">0</div></div>
+    <div class="stat"><div class="label">Avg Profit/Item</div><div class="value" id="sumAvg">£0.00</div></div>
+    <div class="stat"><div class="label">Tax Year Profit</div><div class="value" id="sumTax">£0.00</div></div>
+    <div class="stat"><div class="label">Tax Year Revenue</div><div class="value" id="sumTaxRev">£0.00</div></div>
+  </div>
+
+  <div class="form-card">
+    <h2>Month-by-Month</h2>
+    <div style="overflow-x:auto">
+      <table class="sum-table">
+        <thead><tr><th>Month</th><th>Sales</th><th>Revenue</th><th>Profit</th></tr></thead>
+        <tbody id="sumTbody"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="emptySummary" style="padding:20px 0">Nothing yet.</div>
+  </div>
+
+  <div class="form-card">
+    <h2>Data</h2>
+    <div class="danger-btns">
+      <button class="btn-secondary" onclick="exportBackup()">⬇ Download Backup</button>
+      <button class="btn-secondary" onclick="document.getElementById('restoreFile').click()">⬆ Restore Backup</button>
+      <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="importBackup(event)">
+      <button class="btn-danger" onclick="wipeData()">Clear All Data</button>
+    </div>
+  </div>
+</div>
+
+<!-- Bottom nav -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="navSales" onclick="switchPage('Sales')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+    Sales
+  </button>
+  <button class="nav-btn" id="navInventory" onclick="switchPage('Inventory')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/></svg>
+    Inventory
+  </button>
+  <button class="nav-btn" id="navExpenses" onclick="switchPage('Expenses')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/></svg>
+    Expenses
+  </button>
+  <button class="nav-btn" id="navSummary" onclick="switchPage('Summary')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+    Summary
+  </button>
+</nav>
+
+<script src="https://accounts.google.com/gsi/client" async></script>
+<script>
+const WEB_CLIENT_ID = '598995411258-j5go4reqqjd3ldo8fh2vo7ubdprn5638.apps.googleusercontent.com';
+const STORAGE_KEY = 'reselling_tracker_data_v2';
+const DRIVE_FILE_NAME = 'tracker-data.json';
+
+let inventory = [], sales = [], expenses = [];
+let editingInvId = null, editingSaleId = null, editingExpenseId = null;
+let accessToken = null;
+let driveFileId = localStorage.getItem('driveFileId') || null;
+let tokenClient;
+
+// ===== GOOGLE AUTH =====
+window.onload = () => {
+  loadLocal();
+  renderAll();
+  initGoogle();
+};
+
+function initGoogle() {
+  if (!window.google) {
+    // GIS not loaded yet — retry
+    setTimeout(initGoogle, 500);
+    return;
+  }
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: WEB_CLIENT_ID,
+    scope: 'https://www.googleapis.com/auth/drive.file',
+    callback: async (resp) => {
+      if (resp.error) { console.error(resp); setSyncStatus(false); return; }
+      accessToken = resp.access_token;
+      setSyncStatus(true);
+      await loadFromDrive();
+      renderAll();
+    },
+  });
+  // Try silent sign-in
+  tokenClient.requestAccessToken({ prompt: '' });
+}
+
+function signIn() {
+  tokenClient.requestAccessToken({ prompt: 'consent' });
+}
+
+function setSyncStatus(signedIn) {
+  document.getElementById('syncDot').className = 'sync-dot' + (signedIn ? ' green' : '');
+  document.getElementById('syncMsg').textContent = signedIn ? 'Synced to Google Drive' : 'Not signed in to Google Drive';
+  document.getElementById('signinBtn').style.display = signedIn ? 'none' : '';
+}
+
+// ===== DRIVE API =====
+async function driveRequest(url, options = {}) {
+  if (!accessToken) return null;
+  const res = await fetch(url, {
+    ...options,
+    headers: { Authorization: `Bearer ${accessToken}`, ...(options.headers || {}) },
+  });
+  if (res.status === 401) { accessToken = null; setSyncStatus(false); return null; }
+  return res;
+}
+
+async function loadFromDrive() {
+  try {
+    if (!driveFileId) {
+      const res = await driveRequest(
+        `https://www.googleapis.com/drive/v3/files?q=${encodeURIComponent("name='" + DRIVE_FILE_NAME + "' and trashed=false")}&fields=files(id)&pageSize=1`
+      );
+      if (!res) return;
+      const { files } = await res.json();
+      if (!files || files.length === 0) return;
+      driveFileId = files[0].id;
+      localStorage.setItem('driveFileId', driveFileId);
+    }
+    const res = await driveRequest(`https://www.googleapis.com/drive/v3/files/${driveFileId}?alt=media`);
+    if (!res || !res.ok) { if (res?.status === 404) { driveFileId = null; localStorage.removeItem('driveFileId'); } return; }
+    const data = await res.json();
+    inventory = data.inventory || [];
+    sales = data.sales || [];
+    expenses = data.expenses || [];
+    localStorage.setItem(STORAGE_KEY, JSON.stringify({ inventory, sales, expenses }));
+  } catch(e) { console.error('Drive load:', e); }
+}
+
+async function saveToDrive() {
+  if (!accessToken) return;
+  const body = JSON.stringify({ inventory, sales, expenses });
+  try {
+    if (driveFileId) {
+      await driveRequest(
+        `https://www.googleapis.com/upload/drive/v3/files/${driveFileId}?uploadType=media`,
+        { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body }
+      );
+    } else {
+      const boundary = 'tracker_boundary_xyz';
+      const meta = JSON.stringify({ name: DRIVE_FILE_NAME, mimeType: 'application/json' });
+      const mp = `--${boundary}\r\nContent-Type: application/json\r\n\r\n${meta}\r\n--${boundary}\r\nContent-Type: application/json\r\n\r\n${body}\r\n--${boundary}--`;
+      const res = await driveRequest(
+        'https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id',
+        { method: 'POST', headers: { 'Content-Type': `multipart/related; boundary=${boundary}` }, body: mp }
+      );
+      if (res && res.ok) {
+        const { id } = await res.json();
+        driveFileId = id;
+        localStorage.setItem('driveFileId', driveFileId);
+      }
+    }
+  } catch(e) { console.error('Drive save:', e); }
+}
+
+// ===== LOCAL STORAGE =====
+function loadLocal() {
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    if (raw) { const p = JSON.parse(raw); inventory = p.inventory||[]; sales = p.sales||[]; expenses = p.expenses||[]; }
+  } catch(e) {}
+}
+
+function saveData() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ inventory, sales, expenses }));
+  saveToDrive();
+}
+
+// ===== UTILS =====
+function switchPage(name) {
+  ['Sales','Inventory','Expenses','Summary'].forEach(p => {
+    document.getElementById('page'+p).classList.toggle('active', p===name);
+    document.getElementById('nav'+p).classList.toggle('active', p===name);
+  });
+  if (name === 'Summary') renderSummary();
+}
+function gbp(n) { return '£'+Number(n).toFixed(2); }
+function profit(s) { return s.sold - s.cost - s.shipping; }
+function esc(s) { const d=document.createElement('div'); d.textContent=s; return d.innerHTML; }
+function shortDate(ts) { return new Date(ts).toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
+function timeLabel(ts) { return new Date(ts).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
+function sameDay(a,b) { const d1=new Date(a),d2=new Date(b); return d1.getDate()===d2.getDate()&&d1.getMonth()===d2.getMonth()&&d1.getFullYear()===d2.getFullYear(); }
+function taxYearStart(now) { const y=now.getFullYear(),apr6=new Date(y,3,6); return now>=apr6?apr6:new Date(y-1,3,6); }
+function inPeriod(ts,period) {
+  const d=new Date(ts),now=new Date();
+  if(period==='today') return sameDay(ts,now.getTime());
+  if(period==='month') return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+  if(period==='year') return d.getFullYear()===now.getFullYear();
+  if(period==='taxYear') return d>=taxYearStart(now);
+  return true;
+}
+function col(val) { return val>=0?'green':'red'; }
+function renderAll() { renderSales(); renderInventory(); renderExpenses(); renderSummary(); }
+
+// ===== INVENTORY =====
+function addStock() {
+  const item=document.getElementById('invItem').value.trim();
+  const sku=document.getElementById('invSku').value.trim().toUpperCase();
+  const cost=parseFloat(document.getElementById('invCost').value);
+  if(!item||!sku||isNaN(cost)){alert('Fill in all fields.');return;}
+  if(editingInvId!==null){
+    const inv=inventory.find(i=>i.id===editingInvId);
+    if(inv) Object.assign(inv,{item,sku,cost,edited:shortDate(Date.now())});
+    cancelEditInv();
+  } else {
+    if(inventory.find(i=>i.sku===sku)){alert(`SKU "${sku}" already exists.`);return;}
+    inventory.unshift({id:Date.now(),item,sku,cost,ts:Date.now(),edited:null});
+  }
+  document.getElementById('invItem').value='';
+  document.getElementById('invSku').value='';
+  document.getElementById('invCost').value='';
+  renderInventory(); saveData();
+}
+
+function startEditInv(id) {
+  const inv=inventory.find(i=>i.id===id); if(!inv)return;
+  editingInvId=id;
+  document.getElementById('invItem').value=inv.item;
+  document.getElementById('invSku').value=inv.sku;
+  document.getElementById('invCost').value=inv.cost;
+  document.getElementById('invBtn').textContent='Save Changes';
+  document.getElementById('invBtn').classList.add('editing');
+  document.getElementById('cancelInvBtn').style.display='block';
+  document.getElementById('invFormTitle').textContent='Edit Item';
+  switchPage('Inventory');
+  window.scrollTo({top:0,behavior:'smooth'});
+  renderInventory();
+}
+
+function cancelEditInv() {
+  editingInvId=null;
+  document.getElementById('invBtn').textContent='+ Add Stock';
+  document.getElementById('invBtn').classList.remove('editing');
+  document.getElementById('cancelInvBtn').style.display='none';
+  document.getElementById('invFormTitle').textContent='Add Stock';
+  document.getElementById('invItem').value='';
+  document.getElementById('invSku').value='';
+  document.getElementById('invCost').value='';
+  renderInventory();
+}
+
+function deleteStock(id) {
+  const inv=inventory.find(i=>i.id===id);
+  if(inv&&sales.find(s=>s.sku===inv.sku)){if(!confirm('This item has sales logged. Delete anyway?'))return;}
+  if(editingInvId===id)cancelEditInv();
+  inventory=inventory.filter(i=>i.id!==id);
+  renderInventory(); saveData();
+}
+
+function renderInventory() {
+  const q=document.getElementById('invSearch').value.toLowerCase();
+  const filtered=inventory.filter(i=>i.item.toLowerCase().includes(q)||i.sku.toLowerCase().includes(q));
+  document.getElementById('invCount').textContent=inventory.length;
+  document.getElementById('invValue').textContent=gbp(inventory.reduce((a,i)=>a+i.cost,0));
+  document.getElementById('invSold').textContent=sales.length;
+  const el=document.getElementById('invCards');
+  if(!filtered.length){el.innerHTML='';document.getElementById('emptyInv').style.display='block';return;}
+  document.getElementById('emptyInv').style.display='none';
+  el.innerHTML=filtered.map(i=>`
+    <div class="card ${i.id===editingInvId?'being-edited':''}">
+      <div class="card-title">${esc(i.item)}</div>
+      <div class="card-meta">SKU: <span style="color:#22d3ee;font-family:monospace">${esc(i.sku)}</span> &nbsp;·&nbsp; Cost: ${gbp(i.cost)} &nbsp;·&nbsp; Added ${shortDate(i.ts)}</div>
+      <div class="card-actions">
+        <button class="btn-edit-card" onclick="startEditInv(${i.id})">Edit</button>
+        <button class="btn-del-card" onclick="deleteStock(${i.id})">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+// ===== SKU LOOKUP =====
+function skuLookup() {
+  const val=document.getElementById('saleSku').value.trim().toUpperCase();
+  const hint=document.getElementById('skuHint');
+  if(!val){hint.textContent='';return;}
+  const m=inventory.find(i=>i.sku===val);
+  if(m){hint.textContent=`✓ ${m.item} — cost £${m.cost.toFixed(2)}`;hint.className='sku-hint';}
+  else{hint.textContent='SKU not found in inventory';hint.className='sku-hint sku-err';}
+}
+
+// ===== SALES =====
+function addSale() {
+  const sku=document.getElementById('saleSku').value.trim().toUpperCase();
+  const recipient=document.getElementById('saleRecipient').value.trim();
+  const platform=document.getElementById('salePlatform').value;
+  const sold=parseFloat(document.getElementById('saleSold').value);
+  const shipping=parseFloat(document.getElementById('saleShipping').value)||0;
+  if(!sku||!recipient||isNaN(sold)){alert('Fill in SKU, recipient, and sold price.');return;}
+  const invItem=inventory.find(i=>i.sku===sku);
+  if(!invItem&&editingSaleId===null){if(!confirm(`SKU "${sku}" not in inventory. Log anyway?`))return;}
+  const item=invItem?invItem.item:sku;
+  const cost=invItem?invItem.cost:0;
+  if(editingSaleId!==null){
+    const s=sales.find(s=>s.id===editingSaleId);
+    if(s) Object.assign(s,{sku,item,recipient,platform,cost,sold,shipping,edited:shortDate(Date.now())});
+    cancelEditSale();
+  } else {
+    sales.unshift({id:Date.now(),sku,item,recipient,platform,cost,sold,shipping,ts:Date.now(),edited:null});
+  }
+  document.getElementById('saleSku').value='';
+  document.getElementById('saleRecipient').value='';
+  document.getElementById('saleSold').value='';
+  document.getElementById('saleShipping').value='';
+  document.getElementById('skuHint').textContent='';
+  renderSales(); renderInventory(); saveData();
+}
+
+function startEditSale(id) {
+  const s=sales.find(s=>s.id===id); if(!s)return;
+  editingSaleId=id;
+  document.getElementById('saleSku').value=s.sku;
+  document.getElementById('saleRecipient').value=s.recipient;
+  document.getElementById('salePlatform').value=s.platform;
+  document.getElementById('saleSold').value=s.sold;
+  document.getElementById('saleShipping').value=s.shipping;
+  skuLookup();
+  document.getElementById('saleBtn').textContent='Save Changes';
+  document.getElementById('saleBtn').classList.add('editing');
+  document.getElementById('cancelSaleBtn').style.display='block';
+  document.getElementById('saleFormTitle').textContent='Edit Sale';
+  switchPage('Sales');
+  window.scrollTo({top:0,behavior:'smooth'});
+  renderSales();
+}
+
+function cancelEditSale() {
+  editingSaleId=null;
+  document.getElementById('saleBtn').textContent='+ Log Sale';
+  document.getElementById('saleBtn').classList.remove('editing');
+  document.getElementById('cancelSaleBtn').style.display='none';
+  document.getElementById('saleFormTitle').textContent='Log a Sale';
+  document.getElementById('saleSku').value='';
+  document.getElementById('saleRecipient').value='';
+  document.getElementById('saleSold').value='';
+  document.getElementById('saleShipping').value='';
+  document.getElementById('skuHint').textContent='';
+  renderSales();
+}
+
+function deleteSale(id) {
+  if(editingSaleId===id)cancelEditSale();
+  sales=sales.filter(s=>s.id!==id);
+  renderSales(); renderInventory(); saveData();
+}
+
+function renderSales() {
+  const q=document.getElementById('saleSearch').value.toLowerCase();
+  const filtered=sales.filter(s=>s.item.toLowerCase().includes(q)||s.recipient.toLowerCase().includes(q)||s.sku.toLowerCase().includes(q));
+  const now=new Date();
+  const month=sales.filter(s=>inPeriod(s.ts,'month'));
+  const today=sales.filter(s=>inPeriod(s.ts,'today'));
+  const mExpenses=expenses.filter(e=>inPeriod(e.ts,'month')).reduce((a,e)=>a+e.amount,0);
+  const tExpenses=expenses.filter(e=>inPeriod(e.ts,'today')).reduce((a,e)=>a+e.amount,0);
+  document.getElementById('mCount').textContent=month.length;
+  document.getElementById('mRev').textContent=gbp(month.reduce((a,s)=>a+s.sold,0));
+  const mP=month.reduce((a,s)=>a+profit(s),0)-mExpenses;
+  const tP=today.reduce((a,s)=>a+profit(s),0)-tExpenses;
+  document.getElementById('mProfit').textContent=gbp(mP);
+  document.getElementById('mProfit').className='value '+col(mP);
+  document.getElementById('tProfit').textContent=gbp(tP);
+  document.getElementById('tProfit').className='value '+col(tP);
+  const el=document.getElementById('saleCards');
+  if(!filtered.length){el.innerHTML='';document.getElementById('emptySales').style.display='block';return;}
+  document.getElementById('emptySales').style.display='none';
+  el.innerHTML=filtered.map(s=>{
+    const p=profit(s);
+    return `<div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="card-title">${esc(s.item)}</div>
+        <div class="card-profit ${col(p)}">${gbp(p)}</div>
+      </div>
+      <div class="card-meta">
+        ${esc(s.recipient)} &nbsp;·&nbsp; <span class="badge badge-${s.platform.toLowerCase()}">${s.platform}</span><br>
+        SKU: <span style="color:#22d3ee;font-family:monospace">${esc(s.sku)}</span> &nbsp;·&nbsp; Sold: ${gbp(s.sold)} &nbsp;·&nbsp; Ship: ${gbp(s.shipping)}<br>
+        <span style="color:#5f6368;font-size:0.72rem">${shortDate(s.ts)} ${timeLabel(s.ts)}${s.edited?` · edited ${s.edited}`:''}</span>
+      </div>
+      <div class="card-actions">
+        <button class="btn-edit-card" onclick="startEditSale(${s.id})">Edit</button>
+        <button class="btn-del-card" onclick="deleteSale(${s.id})">Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ===== EXPENSES =====
+function addExpense() {
+  const desc=document.getElementById('expDesc').value.trim();
+  const category=document.getElementById('expCat').value;
+  const amount=parseFloat(document.getElementById('expAmount').value);
+  if(!desc||isNaN(amount)){alert('Fill in description and amount.');return;}
+  if(editingExpenseId!==null){
+    const e=expenses.find(e=>e.id===editingExpenseId);
+    if(e) Object.assign(e,{desc,category,amount,edited:shortDate(Date.now())});
+    cancelEditExpense();
+  } else {
+    expenses.unshift({id:Date.now(),desc,category,amount,ts:Date.now(),edited:null});
+  }
+  document.getElementById('expDesc').value='';
+  document.getElementById('expAmount').value='';
+  renderExpenses(); saveData();
+}
+
+function startEditExpense(id) {
+  const e=expenses.find(e=>e.id===id); if(!e)return;
+  editingExpenseId=id;
+  document.getElementById('expDesc').value=e.desc;
+  document.getElementById('expCat').value=e.category;
+  document.getElementById('expAmount').value=e.amount;
+  document.getElementById('expBtn').textContent='Save Changes';
+  document.getElementById('expBtn').classList.add('editing');
+  document.getElementById('cancelExpBtn').style.display='block';
+  document.getElementById('expFormTitle').textContent='Edit Expense';
+  switchPage('Expenses');
+  window.scrollTo({top:0,behavior:'smooth'});
+  renderExpenses();
+}
+
+function cancelEditExpense() {
+  editingExpenseId=null;
+  document.getElementById('expBtn').textContent='+ Add Expense';
+  document.getElementById('expBtn').classList.remove('editing');
+  document.getElementById('cancelExpBtn').style.display='none';
+  document.getElementById('expFormTitle').textContent='Add Expense';
+  document.getElementById('expDesc').value='';
+  document.getElementById('expAmount').value='';
+  renderExpenses();
+}
+
+function deleteExpense(id) {
+  if(editingExpenseId===id)cancelEditExpense();
+  expenses=expenses.filter(e=>e.id!==id);
+  renderExpenses(); saveData();
+}
+
+function renderExpenses() {
+  const total=expenses.reduce((a,e)=>a+e.amount,0);
+  const monthTotal=expenses.filter(e=>inPeriod(e.ts,'month')).reduce((a,e)=>a+e.amount,0);
+  document.getElementById('expCount').textContent=expenses.length;
+  document.getElementById('expTotal').textContent=gbp(total);
+  document.getElementById('expMonth').textContent=gbp(monthTotal);
+  const el=document.getElementById('expCards');
+  if(!expenses.length){el.innerHTML='';document.getElementById('emptyExp').style.display='block';return;}
+  document.getElementById('emptyExp').style.display='none';
+  el.innerHTML=expenses.map(e=>`
+    <div class="card">
+      <div style="display:flex;justify-content:space-between;align-items:flex-start">
+        <div class="card-title">${esc(e.desc)}</div>
+        <div class="card-profit amber">${gbp(e.amount)}</div>
+      </div>
+      <div class="card-meta"><span class="badge badge-cat">${e.category}</span> &nbsp;·&nbsp; <span style="color:#5f6368;font-size:0.72rem">${shortDate(e.ts)}</span></div>
+      <div class="card-actions">
+        <button class="btn-edit-card" onclick="startEditExpense(${e.id})">Edit</button>
+        <button class="btn-del-card" onclick="deleteExpense(${e.id})">Delete</button>
+      </div>
+    </div>`).join('');
+}
+
+// ===== SUMMARY =====
+function renderSummary() {
+  const allSales=sales;
+  const totalRev=allSales.reduce((a,s)=>a+s.sold,0);
+  const totalProfit=allSales.reduce((a,s)=>a+profit(s),0)-expenses.reduce((a,e)=>a+e.amount,0);
+  document.getElementById('sumRev').textContent=gbp(totalRev);
+  document.getElementById('sumCount').textContent=allSales.length;
+  const profitEl=document.getElementById('sumProfit');
+  profitEl.textContent=gbp(totalProfit); profitEl.className='value '+col(totalProfit);
+  const avgEl=document.getElementById('sumAvg');
+  if(allSales.length) { avgEl.textContent=gbp(allSales.reduce((a,s)=>a+profit(s),0)/allSales.length); avgEl.className='value '+col(allSales.reduce((a,s)=>a+profit(s),0)/allSales.length); }
+  else { avgEl.textContent='£0.00'; avgEl.className='value'; }
+  const now=new Date();
+  const tys=taxYearStart(now);
+  const tyS=sales.filter(s=>new Date(s.ts)>=tys);
+  const tyE=expenses.filter(e=>new Date(e.ts)>=tys);
+  const tyRev=tyS.reduce((a,s)=>a+s.sold,0);
+  const tyProfit=tyS.reduce((a,s)=>a+profit(s),0)-tyE.reduce((a,e)=>a+e.amount,0);
+  document.getElementById('sumTaxRev').textContent=gbp(tyRev);
+  const taxEl=document.getElementById('sumTax'); taxEl.textContent=gbp(tyProfit); taxEl.className='value '+col(tyProfit);
+
+  const months={};
+  const key=ts=>{const d=new Date(ts);return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0');};
+  for(const s of sales){const k=key(s.ts);months[k]=months[k]||{rev:0,costs:0,exp:0,ts:s.ts};months[k].rev+=s.sold;months[k].costs+=s.cost+s.shipping;}
+  for(const e of expenses){const k=key(e.ts);months[k]=months[k]||{rev:0,costs:0,exp:0,ts:e.ts};months[k].exp+=e.amount;}
+  const keys=Object.keys(months).sort().reverse();
+  document.getElementById('emptySummary').style.display=keys.length?'none':'block';
+  document.getElementById('sumTbody').innerHTML=keys.map(k=>{
+    const m=months[k];
+    const label=new Date(m.ts).toLocaleDateString('en-GB',{month:'short',year:'numeric'});
+    const np=m.rev-m.costs-m.exp;
+    return `<tr><td style="font-weight:600">${label}</td><td style="text-align:right">${gbp(m.rev)}</td><td style="text-align:right">${gbp(m.rev-m.costs-m.exp>=0?m.rev:m.rev)}</td><td class="${col(np)}" style="text-align:right;font-weight:700">${gbp(np)}</td></tr>`;
+  }).join('');
+}
+
+// ===== BACKUP =====
+function exportBackup() {
+  const blob=new Blob([JSON.stringify({inventory,sales,expenses},null,2)],{type:'application/json'});
+  const a=document.createElement('a'); a.href=URL.createObjectURL(blob);
+  a.download=`tracker-backup-${new Date().toISOString().slice(0,10)}.json`; a.click();
+}
+function importBackup(e) {
+  const file=e.target.files[0]; if(!file)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    try{
+      const p=JSON.parse(ev.target.result);
+      if(!confirm('Replace all current data with this backup?'))return;
+      inventory=p.inventory||[]; sales=p.sales||[]; expenses=p.expenses||[];
+      saveData(); renderAll(); alert('Restored.');
+    }catch{alert('Invalid file.');}
+  };
+  r.readAsText(file); e.target.value='';
+}
+function wipeData() {
+  if(!confirm('Delete ALL data permanently?'))return;
+  if(!confirm('Really sure?'))return;
+  inventory=[]; sales=[]; expenses=[]; saveData(); renderAll();
+}
+</script>
+</body>
+</html>

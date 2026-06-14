@@ -1,0 +1,45 @@
+{
+  "name": "items-tracker",
+  "version": "1.0.0",
+  "description": "Reselling Sales Tracker desktop app",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "build": "electron-builder --win --x64"
+  },
+  "build": {
+    "appId": "com.itemstracker.app",
+    "productName": "Items Tracker",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "target": "nsis",
+      "icon": "assets/icon.ico"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "files": [
+      "main.js",
+      "preload.js",
+      "items.tracker.html",
+      "credentials.json",
+      "assets/**"
+    ],
+    "publish": {
+      "provider": "github",
+      "owner": "saank2007-star",
+      "repo": "items.tracker"
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9",
+    "googleapis": "^173.0.0"
+  },
+  "devDependencies": {
+    "electron": "^36.0.0",
+    "electron-builder": "^25.0.0"
+  }
+}

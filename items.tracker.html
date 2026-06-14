@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Reselling Sales Tracker</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    background: #0f1115;
+    color: #e8eaed;
+    min-height: 100vh;
+    padding: 32px 16px;
+  }
+  .container { max-width: 1100px; margin: 0 auto; }
+  h1 {
+    font-size: 1.6rem;
+    margin-bottom: 4px;
+    background: linear-gradient(90deg, #4ade80, #22d3ee);
+    -webkit-background-clip: text;
+    background-clip: text;
+    color: transparent;
+  }
+  .subtitle { color: #9aa0a6; font-size: 0.9rem; margin-bottom: 20px; display:flex; align-items:center; gap:10px; }
+  .save-indicator { font-size: 0.78rem; color: #4ade80; opacity: 0; transition: opacity 0.3s; display:flex; align-items:center; gap:4px; }
+  .save-indicator.show { opacity: 1; }
+
+  .tabs { display: flex; gap: 8px; margin-bottom: 20px; }
+  .tab {
+    padding: 10px 22px;
+    border-radius: 8px;
+    font-size: 0.92rem;
+    font-weight: 600;
+    cursor: pointer;
+    border: 1px solid #262a33;
+    background: #181b22;
+    color: #9aa0a6;
+    transition: all 0.15s;
+  }
+  .tab:hover { color: #e8eaed; }
+  .tab.active { background: #4ade80; color: #0f1115; border-color: #4ade80; }
+  .page { display: none; }
+  .page.active { display: block; }
+
+  .card { background: #181b22; border: 1px solid #262a33; border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+  .card h2 { font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9aa0a6; margin-bottom: 14px; }
+
+  .form-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+  .form-grid .full-row { grid-column: 1 / -1; display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 12px; align-items: end; }
+  .inv-grid { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 12px; align-items: end; }
+  .sale-grid { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr auto; gap: 12px; align-items: end; }
+  .expense-grid { display: grid; grid-template-columns: 2fr 1fr 1fr auto; gap: 12px; align-items: end; }
+  @media (max-width: 750px) {
+    .form-grid, .inv-grid, .sale-grid, .expense-grid { grid-template-columns: 1fr 1fr; }
+    .form-grid .full-row { grid-template-columns: 1fr 1fr; }
+  }
+
+  label { display: block; font-size: 0.75rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9aa0a6; margin-bottom: 6px; }
+  input[type="text"], input[type="number"], select {
+    width: 100%; padding: 10px 12px; background: #0f1115; border: 1px solid #2e333d;
+    border-radius: 8px; color: #e8eaed; font-size: 0.95rem; transition: border-color 0.15s;
+  }
+  input:focus, select:focus { outline: none; border-color: #4ade80; }
+  select { cursor: pointer; }
+  input[type="number"]::-webkit-outer-spin-button,
+  input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+  input[type="number"] { -moz-appearance: textfield; appearance: textfield; }
+
+  button { padding: 10px 20px; border: none; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: transform 0.1s, opacity 0.15s; }
+  button:hover { opacity: 0.9; }
+  button:active { transform: scale(0.97); }
+  .btn-add { background: #4ade80; color: #0f1115; }
+  .btn-add.editing { background: #fbbf24; }
+  .btn-export { background: #22d3ee; color: #0f1115; }
+  .btn-cancel { background: #262a33; color: #9aa0a6; display: none; }
+  .btn-delete { background: transparent; color: #f87171; border: 1px solid #3a2226; padding: 6px 12px; font-size: 0.8rem; }
+  .btn-delete:hover { background: #2a1a1d; }
+  .btn-edit { background: transparent; color: #22d3ee; border: 1px solid #1a2e36; padding: 6px 12px; font-size: 0.8rem; margin-right: 6px; }
+  .btn-edit:hover { background: #14242b; }
+  .btn-wipe { background: transparent; color: #f87171; border: 1px solid #3a2226; padding: 8px 16px; font-size: 0.8rem; }
+  .btn-wipe:hover { background: #2a1a1d; }
+  .btn-backup { background: #262a33; color: #e8eaed; font-size: 0.85rem; padding: 8px 16px; }
+
+  .hero-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+  .hero-stats .stat { padding: 22px; }
+  .hero-stats .value { font-size: 2.2rem; }
+  .hero-stats .label { font-size: 0.8rem; }
+
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 20px; }
+  .stats.three { grid-template-columns: repeat(3, 1fr); }
+  .stats.five { grid-template-columns: repeat(5, 1fr); }
+  @media (max-width: 750px) {
+    .stats, .stats.three, .stats.five { grid-template-columns: 1fr 1fr; }
+    .hero-stats { grid-template-columns: 1fr; }
+  }
+  .stat { background: #181b22; border: 1px solid #262a33; border-radius: 12px; padding: 16px; }
+  .stat .label { font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9aa0a6; margin-bottom: 6px; }
+  .stat .value { font-size: 1.4rem; font-weight: 700; }
+  .green { color: #4ade80; }
+  .red { color: #f87171; }
+  .cyan { color: #22d3ee; }
+  .amber { color: #fbbf24; }
+
+  .toolbar { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
+  .toolbar input { flex: 1; min-width: 180px; }
+  .toolbar select { width: auto; min-width: 140px; }
+
+  .table-wrap { overflow-x: auto; scrollbar-color: #2e333d #181b22; scrollbar-width: thin; }
+  .table-wrap::-webkit-scrollbar { height: 8px; }
+  .table-wrap::-webkit-scrollbar-track { background: #181b22; border-radius: 8px; }
+  .table-wrap::-webkit-scrollbar-thumb { background: #2e333d; border-radius: 8px; }
+  .table-wrap::-webkit-scrollbar-thumb:hover { background: #4ade80; }
+  table { width: 100%; border-collapse: collapse; min-width: 700px; }
+  table.sales-table { min-width: 900px; }
+  table.expense-table { min-width: 700px; }
+  table.summary-table { min-width: 500px; }
+  th { text-align: left; font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.05em; color: #9aa0a6; padding: 10px 12px; border-bottom: 1px solid #262a33; white-space: nowrap; }
+  td { padding: 12px; border-bottom: 1px solid #1e222a; font-size: 0.9rem; white-space: nowrap; }
+  tbody tr:not(.day-header):hover td { background: #1c2027; }
+  tr.being-edited td { background: #20221a !important; }
+  .day-header td { background: #11141a; color: #4ade80; font-size: 0.78rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; padding: 8px 12px; }
+  .sku { font-family: 'Consolas', monospace; color: #22d3ee; }
+  .time { color: #9aa0a6; font-size: 0.85rem; font-family: 'Consolas', monospace; }
+  .edited-tag { color: #fbbf24; font-size: 0.72rem; font-family: 'Segoe UI', system-ui, sans-serif; }
+  .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 0.75rem; font-weight: 600; }
+  .badge-ebay { background: #1e2a3a; color: #60a5fa; }
+  .badge-vinted { background: #0f2e2a; color: #2dd4bf; }
+  .badge-depop { background: #2a1a2e; color: #e879f9; }
+  .badge-cat { background: #2a2415; color: #fbbf24; }
+  .empty { text-align: center; color: #5f6368; padding: 40px 0; font-size: 0.95rem; }
+  .danger-zone { display:flex; justify-content:flex-end; gap: 10px; margin-top: -8px; margin-bottom: 20px; }
+
+  .sku-hint { font-size: 0.78rem; color: #4ade80; margin-top: 4px; min-height: 18px; }
+  .sku-err { color: #f87171; }
+
+  .sync-bar { display:flex; align-items:center; gap:10px; background:#181b22; border:1px solid #262a33; border-radius:8px; padding:8px 14px; margin-bottom:16px; font-size:0.82rem; }
+  .sync-bar span { flex:1; }
+  .btn-sync { background:#4ade80; color:#0f1115; padding:5px 14px; font-size:0.8rem; border-radius:6px; }
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>Reselling Sales Tracker</h1>
+  <p class="subtitle">Sales, expenses, and profit — all in one place
+    <span class="save-indicator" id="saveIndicator">✓ Saved</span>
+  </p>
+
+  <div class="sync-bar" id="syncBar">
+    <span id="syncMsg">☁ Not connected to Google Drive</span>
+    <button class="btn-sync" id="syncBtn" onclick="connectGoogle()">Sign in with Google</button>
+  </div>
+
+  <div class="tabs">
+    <button class="tab" id="tabInventory" onclick="switchPage('inventory')">Inventory</button>
+    <button class="tab active" id="tabSales" onclick="switchPage('sales')">Sales</button>
+    <button class="tab" id="tabExpenses" onclick="switchPage('expenses')">Misc Expenses</button>
+    <button class="tab" id="tabSummary" onclick="switchPage('summary')">Summary</button>
+  </div>
+
+  <!-- ============ INVENTORY PAGE ============ -->
+  <div class="page" id="pageInventory">
+    <div class="stats three">
+      <div class="stat"><div class="label">Items In Stock</div><div class="value cyan" id="invCount">0</div></div>
+      <div class="stat"><div class="label">Stock Value (Cost)</div><div class="value amber" id="invValue">£0.00</div></div>
+      <div class="stat"><div class="label">Items Sold (All Time)</div><div class="value green" id="invSoldCount">0</div></div>
+    </div>
+
+    <div class="card">
+      <div class="inv-grid">
+        <div>
+          <label for="invItem">Item Name</label>
+          <input type="text" id="invItem" placeholder="e.g. Arsenal 04/05 Home Shirt">
+        </div>
+        <div>
+          <label for="invSku">SKU</label>
+          <input type="text" id="invSku" placeholder="e.g. FS-001">
+        </div>
+        <div>
+          <label for="invCost">Cost Price (£)</label>
+          <input type="number" id="invCost" step="0.01" min="0" placeholder="e.g. 12.50">
+        </div>
+        <div style="display:flex;gap:8px;align-items:flex-end">
+          <button class="btn-cancel" id="cancelInv" onclick="cancelEditInv()">Cancel</button>
+          <button class="btn-add" id="invBtn" onclick="addStock()">+ Add Stock</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <input type="text" id="invSearch" placeholder="Search inventory..." oninput="renderInventory()">
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>SKU</th>
+              <th>Cost Price</th>
+              <th>Date Added</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="invTbody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptyInv">No stock logged yet. Add your first item above.</div>
+    </div>
+  </div>
+
+  <!-- ============ SALES PAGE ============ -->
+  <div class="page active" id="pageSales">
+    <div class="hero-stats">
+      <div class="stat"><div class="label">Items Sold This Month</div><div class="value cyan" id="heroCount">0</div></div>
+      <div class="stat"><div class="label">Revenue This Month</div><div class="value" id="heroRev">£0.00</div></div>
+    </div>
+    <div class="stats">
+      <div class="stat"><div class="label">Profit This Month</div><div class="value" id="statProfitMonth">£0.00</div></div>
+      <div class="stat"><div class="label">Profit Today</div><div class="value" id="statProfitToday">£0.00</div></div>
+      <div class="stat"><div class="label">Costs This Month</div><div class="value red" id="statCostMonth">£0.00</div></div>
+      <div class="stat"><div class="label">Costs Today</div><div class="value red" id="statCostToday">£0.00</div></div>
+    </div>
+
+    <div class="card">
+      <div class="sale-grid">
+        <div>
+          <label for="saleSku">SKU</label>
+          <input type="text" id="saleSku" placeholder="e.g. FS-001" oninput="skuLookup()">
+          <div class="sku-hint" id="skuHint"></div>
+        </div>
+        <div>
+          <label for="saleRecipient">Recipient</label>
+          <input type="text" id="saleRecipient" placeholder="e.g. John Smith">
+        </div>
+        <div>
+          <label for="salePlatform">Platform</label>
+          <select id="salePlatform">
+            <option value="eBay">eBay</option>
+            <option value="Vinted">Vinted</option>
+            <option value="Depop">Depop</option>
+          </select>
+        </div>
+        <div>
+          <label for="saleSold">Sold For (£)</label>
+          <input type="number" id="saleSold" step="0.01" min="0" placeholder="e.g. 35.00">
+        </div>
+        <div>
+          <label for="saleShipping">Shipping (£)</label>
+          <input type="number" id="saleShipping" step="0.01" min="0" placeholder="e.g. 3.20">
+        </div>
+      </div>
+      <div style="display:flex;gap:8px;margin-top:12px;justify-content:flex-end">
+        <button class="btn-cancel" id="cancelSale" onclick="cancelEditSale()">Cancel</button>
+        <button class="btn-add" id="saleBtn" onclick="addSale()">+ Log Sale</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="toolbar">
+        <input type="text" id="search" placeholder="Search by item, recipient, or SKU..." oninput="renderSales()">
+        <select id="filterPlatform" onchange="renderSales()">
+          <option value="">All Platforms</option>
+          <option value="eBay">eBay</option>
+          <option value="Vinted">Vinted</option>
+          <option value="Depop">Depop</option>
+        </select>
+        <button class="btn-export" onclick="exportSalesCSV()">Export CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table class="sales-table">
+          <thead>
+            <tr>
+              <th>Item</th>
+              <th>Recipient</th>
+              <th>SKU</th>
+              <th>Platform</th>
+              <th>Cost</th>
+              <th>Sold For</th>
+              <th>Shipping</th>
+              <th>Profit</th>
+              <th>Time</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptySales">No sales logged yet. Add stock in Inventory, then log a sale by SKU.</div>
+    </div>
+  </div>
+
+  <!-- ============ EXPENSES PAGE ============ -->
+  <div class="page" id="pageExpenses">
+    <div class="stats three">
+      <div class="stat"><div class="label">Expenses Logged</div><div class="value cyan" id="expCount">0</div></div>
+      <div class="stat"><div class="label">Total Expenses</div><div class="value amber" id="expTotal">£0.00</div></div>
+      <div class="stat"><div class="label">This Month</div><div class="value" id="expMonth">£0.00</div></div>
+    </div>
+    <div class="card">
+      <div class="expense-grid">
+        <div>
+          <label for="expDesc">Description</label>
+          <input type="text" id="expDesc" placeholder="e.g. Poly mailers x100">
+        </div>
+        <div>
+          <label for="expCat">Category</label>
+          <select id="expCat">
+            <option value="Packaging">Packaging</option>
+            <option value="Storage/Lockup">Storage/Lockup</option>
+            <option value="Fuel/Travel">Fuel/Travel</option>
+            <option value="Subscriptions/Tools">Subscriptions/Tools</option>
+            <option value="Equipment">Equipment</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div>
+          <label for="expAmount">Amount (£)</label>
+          <input type="number" id="expAmount" step="0.01" min="0" placeholder="e.g. 8.99">
+        </div>
+        <div style="display:flex;gap:8px">
+          <button class="btn-cancel" id="cancelExp" onclick="cancelEditExpense()">Cancel</button>
+          <button class="btn-add" id="expBtn" onclick="addExpense()">+ Add Expense</button>
+        </div>
+      </div>
+    </div>
+    <div class="card">
+      <div class="toolbar">
+        <input type="text" id="expSearch" placeholder="Search expenses..." oninput="renderExpenses()">
+        <select id="filterCat" onchange="renderExpenses()">
+          <option value="">All Categories</option>
+          <option value="Packaging">Packaging</option>
+          <option value="Storage/Lockup">Storage/Lockup</option>
+          <option value="Fuel/Travel">Fuel/Travel</option>
+          <option value="Subscriptions/Tools">Subscriptions/Tools</option>
+          <option value="Equipment">Equipment</option>
+          <option value="Other">Other</option>
+        </select>
+        <button class="btn-export" onclick="exportExpensesCSV()">Export CSV</button>
+      </div>
+      <div class="table-wrap">
+        <table class="expense-table">
+          <thead><tr><th>Description</th><th>Category</th><th>Amount</th><th>Time</th><th></th></tr></thead>
+          <tbody id="expTbody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptyExpenses">No expenses logged yet. Mailers, fuel, equipment — chuck it all in.</div>
+    </div>
+  </div>
+
+  <!-- ============ SUMMARY PAGE ============ -->
+  <div class="page" id="pageSummary">
+    <div class="card">
+      <h2>All-Time &amp; Period Stats</h2>
+      <div class="stats five" style="margin-bottom:12px">
+        <div class="stat"><div class="label">Items Sold (All Time)</div><div class="value cyan" id="sumCount">0</div></div>
+        <div class="stat"><div class="label">Total Revenue</div><div class="value" id="sumRev">£0.00</div></div>
+        <div class="stat"><div class="label">Total Costs</div><div class="value red" id="sumCost">£0.00</div></div>
+        <div class="stat"><div class="label">Net Profit (All Time)</div><div class="value" id="sumProfit">£0.00</div></div>
+        <div class="stat"><div class="label">Avg Profit Per Item</div><div class="value" id="sumAvgProfit">£0.00</div></div>
+      </div>
+      <div class="stats" style="margin-bottom:0">
+        <div class="stat"><div class="label">Profit This Year</div><div class="value" id="sumYear">£0.00</div></div>
+        <div class="stat"><div class="label">Profit This Tax Year</div><div class="value" id="sumTaxYear">£0.00</div></div>
+        <div class="stat"><div class="label">Revenue This Year</div><div class="value" id="sumRevYear">£0.00</div></div>
+        <div class="stat"><div class="label">Items Sold This Year</div><div class="value cyan" id="sumCountYear">0</div></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Month-by-Month Breakdown</h2>
+      <div class="table-wrap">
+        <table class="summary-table">
+          <thead><tr><th>Month</th><th>Items Sold</th><th>Revenue</th><th>Item Costs</th><th>Misc Expenses</th><th>Net Profit</th></tr></thead>
+          <tbody id="summaryTbody"></tbody>
+        </table>
+      </div>
+      <div class="empty" id="emptySummary">Nothing to summarise yet.</div>
+    </div>
+    <div class="card">
+      <h2>Tax Year (6 Apr – 5 Apr)</h2>
+      <div class="stats three" style="margin-bottom:0">
+        <div class="stat"><div class="label">Turnover This Tax Year</div><div class="value cyan" id="taxTurnover">£0.00</div></div>
+        <div class="stat"><div class="label">Allowable Costs</div><div class="value amber" id="taxCosts">£0.00</div></div>
+        <div class="stat"><div class="label">Taxable Profit</div><div class="value" id="taxProfit">£0.00</div></div>
+      </div>
+    </div>
+    <div class="danger-zone">
+      <button class="btn-backup" onclick="exportBackup()">⬇ Backup Data</button>
+      <button class="btn-backup" onclick="document.getElementById('restoreFile').click()">⬆ Restore Backup</button>
+      <input type="file" id="restoreFile" accept=".json" style="display:none" onchange="importBackup(event)">
+      <button class="btn-wipe" onclick="wipeAllData()">Clear All Data</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  let inventory = [];
+  let sales = [];
+  let expenses = [];
+  let editingInvId = null;
+  let editingSaleId = null;
+  let editingExpenseId = null;
+  let driveReady = false;
+  const STORAGE_KEY = 'reselling_tracker_data_v2';
+
+  // ===== DRIVE SYNC =====
+  function updateSyncBar() {
+    const msg = document.getElementById('syncMsg');
+    const btn = document.getElementById('syncBtn');
+    if (driveReady) {
+      msg.textContent = '☁ Synced to Google Drive';
+      msg.style.color = '#4ade80';
+      btn.style.display = 'none';
+    } else {
+      msg.textContent = '☁ Not connected to Google Drive';
+      msg.style.color = '#9aa0a6';
+      btn.style.display = '';
+    }
+  }
+
+  async function connectGoogle() {
+    const btn = document.getElementById('syncBtn');
+    btn.textContent = 'Signing in…';
+    btn.disabled = true;
+    try {
+      const result = await window.electronAPI.signIn();
+      if (result.success) {
+        driveReady = true;
+        const driveData = await window.electronAPI.loadData();
+        if (driveData && (driveData.inventory?.length || driveData.sales?.length || driveData.expenses?.length)) {
+          if (confirm('Existing data found on Google Drive. Load it? (Local data will be replaced.)')) {
+            inventory = driveData.inventory || [];
+            sales = driveData.sales || [];
+            expenses = driveData.expenses || [];
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ inventory, sales, expenses }));
+            renderInventory(); renderSales(); renderExpenses();
+          }
+        }
+      } else {
+        alert('Sign in failed: ' + (result.error || 'unknown error'));
+      }
+    } catch(e) { alert('Sign in error: ' + e.message); }
+    btn.textContent = 'Sign in with Google';
+    btn.disabled = false;
+    updateSyncBar();
+  }
+
+  // ===== PERSISTENCE =====
+  async function loadData() {
+    if (window.electronAPI) {
+      try {
+        const { signedIn } = await window.electronAPI.getStatus();
+        driveReady = signedIn;
+        if (signedIn) {
+          const driveData = await window.electronAPI.loadData();
+          if (driveData) {
+            inventory = driveData.inventory || [];
+            sales = driveData.sales || [];
+            expenses = driveData.expenses || [];
+            localStorage.setItem(STORAGE_KEY, JSON.stringify({ inventory, sales, expenses }));
+            updateSyncBar();
+            return;
+          }
+        }
+      } catch(e) { console.error('Drive load failed:', e); }
+    }
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (raw) {
+        const p = JSON.parse(raw);
+        inventory = p.inventory || [];
+        sales = p.sales || [];
+        expenses = p.expenses || [];
+      }
+    } catch(e) { console.error(e); }
+    updateSyncBar();
+  }
+
+  let saveTimeout = null;
+  function saveData() {
+    const data = { inventory, sales, expenses };
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+      const ind = document.getElementById('saveIndicator');
+      ind.classList.add('show');
+      clearTimeout(saveTimeout);
+      saveTimeout = setTimeout(() => ind.classList.remove('show'), 1500);
+    } catch(e) { console.error(e); }
+    if (window.electronAPI && driveReady) {
+      window.electronAPI.saveData(data).catch(e => console.error('Drive save failed:', e));
+    }
+  }
+  function wipeAllData() {
+    if (!confirm('Permanently delete ALL data?')) return;
+    if (!confirm('Really sure? Cannot be undone.')) return;
+    inventory = []; sales = []; expenses = [];
+    saveData(); renderInventory(); renderSales(); renderExpenses(); renderSummary();
+  }
+  function exportBackup() {
+    const blob = new Blob([JSON.stringify({ inventory, sales, expenses }, null, 2)], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `tracker-backup-${shortDate(Date.now()).replace(/ /g,'-')}.json`;
+    a.click();
+  }
+  function importBackup(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    const r = new FileReader();
+    r.onload = ev => {
+      try {
+        const p = JSON.parse(ev.target.result);
+        if (!confirm('This will replace all current data with the backup. Continue?')) return;
+        inventory = p.inventory || [];
+        sales = p.sales || [];
+        expenses = p.expenses || [];
+        saveData(); renderInventory(); renderSales(); renderExpenses(); renderSummary();
+        alert('Backup restored successfully.');
+      } catch { alert('Invalid backup file.'); }
+    };
+    r.readAsText(file);
+    e.target.value = '';
+  }
+
+  // ===== UTILS =====
+  function switchPage(page) {
+    ['Inventory','Sales','Expenses','Summary'].forEach(p => {
+      document.getElementById('page' + p).classList.toggle('active', page === p.toLowerCase());
+      document.getElementById('tab' + p).classList.toggle('active', page === p.toLowerCase());
+    });
+    if (page === 'summary') renderSummary();
+  }
+  function gbp(n) { return '£' + n.toFixed(2); }
+  function profit(s) { return s.sold - s.cost - s.shipping; }
+  function esc(str) { const d = document.createElement('div'); d.textContent = str; return d.innerHTML; }
+  function dayLabel(ts) { return new Date(ts).toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'short', year:'numeric' }); }
+  function shortDate(ts) { return new Date(ts).toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' }); }
+  function timeLabel(ts) { return new Date(ts).toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }); }
+  function sameDay(a,b) { const d1=new Date(a),d2=new Date(b); return d1.getDate()===d2.getDate()&&d1.getMonth()===d2.getMonth()&&d1.getFullYear()===d2.getFullYear(); }
+  function taxYearStart(now) { const y=now.getFullYear(),apr6=new Date(y,3,6); return now>=apr6?apr6:new Date(y-1,3,6); }
+  function inPeriod(ts,period) {
+    const d=new Date(ts),now=new Date();
+    if(period==='today') return sameDay(ts,now.getTime());
+    if(period==='month') return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear();
+    if(period==='year') return d.getFullYear()===now.getFullYear();
+    if(period==='taxYear') return d>=taxYearStart(now);
+    return true;
+  }
+  function colourise(el,val) { el.textContent=gbp(val); el.className='value '+(val>=0?'green':'red'); }
+  function timeCell(entry) {
+    let html = timeLabel(entry.ts);
+    if (entry.edited) html += ` <span class="edited-tag">(edited ${entry.edited})</span>`;
+    return html;
+  }
+
+  // ===== INVENTORY =====
+  function addStock() {
+    const item = document.getElementById('invItem').value.trim();
+    const sku = document.getElementById('invSku').value.trim().toUpperCase();
+    const cost = parseFloat(document.getElementById('invCost').value);
+    if (!item || !sku || isNaN(cost)) { alert('Fill in item name, SKU, and cost price.'); return; }
+
+    if (editingInvId !== null) {
+      const inv = inventory.find(i => i.id === editingInvId);
+      if (inv) Object.assign(inv, { item, sku, cost, edited: shortDate(Date.now()) });
+      cancelEditInv();
+    } else {
+      if (inventory.find(i => i.sku === sku)) { alert(`SKU "${sku}" already exists in inventory.`); return; }
+      inventory.unshift({ id: Date.now(), item, sku, cost, ts: Date.now(), edited: null });
+    }
+    document.getElementById('invItem').value = '';
+    document.getElementById('invSku').value = '';
+    document.getElementById('invCost').value = '';
+    document.getElementById('invItem').focus();
+    renderInventory(); saveData();
+  }
+
+  function startEditInv(id) {
+    const inv = inventory.find(i => i.id === id);
+    if (!inv) return;
+    editingInvId = id;
+    document.getElementById('invItem').value = inv.item;
+    document.getElementById('invSku').value = inv.sku;
+    document.getElementById('invCost').value = inv.cost;
+    const btn = document.getElementById('invBtn');
+    btn.textContent = 'Save Changes'; btn.classList.add('editing');
+    document.getElementById('cancelInv').style.display = 'block';
+    document.getElementById('invItem').focus();
+    renderInventory(); window.scrollTo({ top:0, behavior:'smooth' });
+  }
+
+  function cancelEditInv() {
+    editingInvId = null;
+    const btn = document.getElementById('invBtn');
+    btn.textContent = '+ Add Stock'; btn.classList.remove('editing');
+    document.getElementById('cancelInv').style.display = 'none';
+    document.getElementById('invItem').value = '';
+    document.getElementById('invSku').value = '';
+    document.getElementById('invCost').value = '';
+    renderInventory();
+  }
+
+  function deleteStock(id) {
+    const inv = inventory.find(i => i.id === id);
+    if (inv && sales.find(s => s.sku === inv.sku)) {
+      if (!confirm('This item has sales logged against it. Delete from inventory anyway?')) return;
+    }
+    if (editingInvId === id) cancelEditInv();
+    inventory = inventory.filter(i => i.id !== id);
+    renderInventory(); saveData();
+  }
+
+  function renderInventory() {
+    const q = document.getElementById('invSearch').value.toLowerCase();
+    const filtered = inventory.filter(i =>
+      i.item.toLowerCase().includes(q) || i.sku.toLowerCase().includes(q)
+    );
+    document.getElementById('invTbody').innerHTML = filtered.map(i => `
+      <tr class="${i.id === editingInvId ? 'being-edited' : ''}">
+        <td>${esc(i.item)}</td>
+        <td class="sku">${esc(i.sku)}</td>
+        <td>${gbp(i.cost)}${i.edited ? ` <span class="edited-tag">(edited ${i.edited})</span>` : ''}</td>
+        <td class="time">${shortDate(i.ts)}</td>
+        <td><button class="btn-edit" onclick="startEditInv(${i.id})">Edit</button><button class="btn-delete" onclick="deleteStock(${i.id})">Delete</button></td>
+      </tr>
+    `).join('');
+    document.getElementById('invCount').textContent = inventory.length;
+    document.getElementById('invValue').textContent = gbp(inventory.reduce((a,i) => a + i.cost, 0));
+    document.getElementById('invSoldCount').textContent = sales.length;
+    document.getElementById('emptyInv').style.display = inventory.length ? 'none' : 'block';
+  }
+
+  // ===== SKU LOOKUP =====
+  function skuLookup() {
+    const val = document.getElementById('saleSku').value.trim().toUpperCase();
+    const hint = document.getElementById('skuHint');
+    if (!val) { hint.textContent = ''; return; }
+    const match = inventory.find(i => i.sku === val);
+    if (match) {
+      hint.textContent = `✓ ${match.item} — cost £${match.cost.toFixed(2)}`;
+      hint.className = 'sku-hint';
+    } else {
+      hint.textContent = `SKU not found in inventory`;
+      hint.className = 'sku-hint sku-err';
+    }
+  }
+
+  // ===== SALES =====
+  function addSale() {
+    const sku = document.getElementById('saleSku').value.trim().toUpperCase();
+    const recipient = document.getElementById('saleRecipient').value.trim();
+    const platform = document.getElementById('salePlatform').value;
+    const sold = parseFloat(document.getElementById('saleSold').value);
+    const shipping = parseFloat(document.getElementById('saleShipping').value) || 0;
+
+    if (!sku || !recipient || isNaN(sold)) { alert('Fill in SKU, recipient, and sold price.'); return; }
+
+    const invItem = inventory.find(i => i.sku === sku);
+    if (!invItem && editingSaleId === null) {
+      if (!confirm(`SKU "${sku}" not found in inventory. Log anyway?`)) return;
+    }
+    const item = invItem ? invItem.item : sku;
+    const cost = invItem ? invItem.cost : 0;
+
+    if (editingSaleId !== null) {
+      const s = sales.find(s => s.id === editingSaleId);
+      if (s) Object.assign(s, { sku, item, recipient, platform, cost, sold, shipping, edited: shortDate(Date.now()) });
+      cancelEditSale();
+    } else {
+      sales.unshift({ id: Date.now(), sku, item, recipient, platform, cost, sold, shipping, ts: Date.now(), edited: null });
+    }
+    clearSaleForm(); renderSales(); renderInventory(); saveData();
+  }
+
+  function clearSaleForm() {
+    ['saleSku','saleRecipient','saleSold','saleShipping'].forEach(id => document.getElementById(id).value = '');
+    document.getElementById('skuHint').textContent = '';
+    document.getElementById('saleSku').focus();
+  }
+
+  function startEditSale(id) {
+    const s = sales.find(s => s.id === id);
+    if (!s) return;
+    editingSaleId = id;
+    document.getElementById('saleSku').value = s.sku;
+    document.getElementById('saleRecipient').value = s.recipient;
+    document.getElementById('salePlatform').value = s.platform;
+    document.getElementById('saleSold').value = s.sold;
+    document.getElementById('saleShipping').value = s.shipping;
+    skuLookup();
+    const btn = document.getElementById('saleBtn');
+    btn.textContent = 'Save Changes'; btn.classList.add('editing');
+    document.getElementById('cancelSale').style.display = 'block';
+    switchPage('sales');
+    window.scrollTo({ top:0, behavior:'smooth' });
+    renderSales();
+  }
+
+  function cancelEditSale() {
+    editingSaleId = null;
+    const btn = document.getElementById('saleBtn');
+    btn.textContent = '+ Log Sale'; btn.classList.remove('editing');
+    document.getElementById('cancelSale').style.display = 'none';
+    clearSaleForm(); renderSales();
+  }
+
+  function deleteSale(id) {
+    if (editingSaleId === id) cancelEditSale();
+    sales = sales.filter(s => s.id !== id);
+    renderSales(); renderInventory(); saveData();
+  }
+
+  function renderSales() {
+    const q = document.getElementById('search').value.toLowerCase();
+    const pf = document.getElementById('filterPlatform').value;
+    const filtered = sales.filter(s =>
+      (s.item.toLowerCase().includes(q) || s.recipient.toLowerCase().includes(q) || s.sku.toLowerCase().includes(q)) &&
+      (!pf || s.platform === pf)
+    );
+    let html = '', lastDay = null;
+    for (const s of filtered) {
+      const label = dayLabel(s.ts);
+      if (label !== lastDay) { html += `<tr class="day-header"><td colspan="10">${label}</td></tr>`; lastDay = label; }
+      const p = profit(s);
+      html += `
+      <tr class="${s.id === editingSaleId ? 'being-edited' : ''}">
+        <td>${esc(s.item)}</td><td>${esc(s.recipient)}</td><td class="sku">${esc(s.sku)}</td>
+        <td><span class="badge badge-${s.platform.toLowerCase()}">${s.platform}</span></td>
+        <td>${gbp(s.cost)}</td><td>${gbp(s.sold)}</td><td>${gbp(s.shipping)}</td>
+        <td class="${p>=0?'green':'red'}" style="font-weight:700">${gbp(p)}</td>
+        <td class="time">${timeCell(s)}</td>
+        <td><button class="btn-edit" onclick="startEditSale(${s.id})">Edit</button><button class="btn-delete" onclick="deleteSale(${s.id})">Delete</button></td>
+      </tr>`;
+    }
+    document.getElementById('tbody').innerHTML = html;
+    updateStats();
+    document.getElementById('emptySales').style.display = sales.length ? 'none' : 'block';
+  }
+
+  // ===== EXPENSES =====
+  function addExpense() {
+    const desc = document.getElementById('expDesc').value.trim();
+    const category = document.getElementById('expCat').value;
+    const amount = parseFloat(document.getElementById('expAmount').value);
+    if (!desc || isNaN(amount)) { alert('Fill in description and amount.'); return; }
+    if (editingExpenseId !== null) {
+      const e = expenses.find(e => e.id === editingExpenseId);
+      if (e) Object.assign(e, { desc, category, amount, edited: shortDate(Date.now()) });
+      cancelEditExpense();
+    } else {
+      expenses.unshift({ id: Date.now(), desc, category, amount, ts: Date.now(), edited: null });
+    }
+    document.getElementById('expDesc').value = '';
+    document.getElementById('expAmount').value = '';
+    document.getElementById('expDesc').focus();
+    renderExpenses(); saveData();
+  }
+
+  function startEditExpense(id) {
+    const e = expenses.find(e => e.id === id);
+    if (!e) return;
+    editingExpenseId = id;
+    document.getElementById('expDesc').value = e.desc;
+    document.getElementById('expCat').value = e.category;
+    document.getElementById('expAmount').value = e.amount;
+    const btn = document.getElementById('expBtn');
+    btn.textContent = 'Save Changes'; btn.classList.add('editing');
+    document.getElementById('cancelExp').style.display = 'block';
+    document.getElementById('expDesc').focus();
+    renderExpenses(); window.scrollTo({ top:0, behavior:'smooth' });
+  }
+
+  function cancelEditExpense() {
+    editingExpenseId = null;
+    const btn = document.getElementById('expBtn');
+    btn.textContent = '+ Add Expense'; btn.classList.remove('editing');
+    document.getElementById('cancelExp').style.display = 'none';
+    document.getElementById('expDesc').value = '';
+    document.getElementById('expAmount').value = '';
+    renderExpenses();
+  }
+
+  function deleteExpense(id) {
+    if (editingExpenseId === id) cancelEditExpense();
+    expenses = expenses.filter(e => e.id !== id);
+    renderExpenses(); saveData();
+  }
+
+  function renderExpenses() {
+    const q = document.getElementById('expSearch').value.toLowerCase();
+    const cat = document.getElementById('filterCat').value;
+    const filtered = expenses.filter(e => e.desc.toLowerCase().includes(q) && (!cat || e.category === cat));
+    let html = '', lastDay = null;
+    for (const e of filtered) {
+      const label = dayLabel(e.ts);
+      if (label !== lastDay) { html += `<tr class="day-header"><td colspan="5">${label}</td></tr>`; lastDay = label; }
+      html += `
+      <tr class="${e.id === editingExpenseId ? 'being-edited' : ''}">
+        <td>${esc(e.desc)}</td>
+        <td><span class="badge badge-cat">${e.category}</span></td>
+        <td class="amber" style="font-weight:700">${gbp(e.amount)}</td>
+        <td class="time">${timeCell(e)}</td>
+        <td><button class="btn-edit" onclick="startEditExpense(${e.id})">Edit</button><button class="btn-delete" onclick="deleteExpense(${e.id})">Delete</button></td>
+      </tr>`;
+    }
+    document.getElementById('expTbody').innerHTML = html;
+    const total = expenses.reduce((a,e) => a+e.amount, 0);
+    const monthTotal = expenses.filter(e => inPeriod(e.ts,'month')).reduce((a,e) => a+e.amount, 0);
+    document.getElementById('expCount').textContent = expenses.length;
+    document.getElementById('expTotal').textContent = gbp(total);
+    document.getElementById('expMonth').textContent = gbp(monthTotal);
+    updateStats();
+    document.getElementById('emptyExpenses').style.display = expenses.length ? 'none' : 'block';
+  }
+
+  // ===== STATS =====
+  function periodTotals(period) {
+    const ps = sales.filter(s => inPeriod(s.ts, period));
+    const pe = expenses.filter(e => inPeriod(e.ts, period));
+    const rev = ps.reduce((a,s) => a+s.sold, 0);
+    const itemCosts = ps.reduce((a,s) => a+s.cost+s.shipping, 0);
+    const exp = pe.reduce((a,e) => a+e.amount, 0);
+    return { count: ps.length, rev, costs: itemCosts+exp, profit: rev-itemCosts-exp };
+  }
+
+  function updateStats() {
+    const m = periodTotals('month'), t = periodTotals('today');
+    document.getElementById('heroCount').textContent = m.count;
+    document.getElementById('heroRev').textContent = gbp(m.rev);
+    colourise(document.getElementById('statProfitMonth'), m.profit);
+    colourise(document.getElementById('statProfitToday'), t.profit);
+    document.getElementById('statCostMonth').textContent = gbp(m.costs);
+    document.getElementById('statCostToday').textContent = gbp(t.costs);
+  }
+
+  // ===== SUMMARY =====
+  function renderSummary() {
+    const all = periodTotals('all'), yr = periodTotals('year');
+    document.getElementById('sumCount').textContent = all.count;
+    document.getElementById('sumRev').textContent = gbp(all.rev);
+    document.getElementById('sumCost').textContent = gbp(all.costs);
+    colourise(document.getElementById('sumProfit'), all.profit);
+    colourise(document.getElementById('sumYear'), yr.profit);
+    colourise(document.getElementById('sumTaxYear'), periodTotals('taxYear').profit);
+    document.getElementById('sumRevYear').textContent = gbp(yr.rev);
+    document.getElementById('sumCountYear').textContent = yr.count;
+
+    const avgEl = document.getElementById('sumAvgProfit');
+    if (sales.length > 0) {
+      colourise(avgEl, sales.reduce((a,s) => a+profit(s), 0) / sales.length);
+    } else { avgEl.textContent = '£0.00'; avgEl.className = 'value'; }
+
+    const months = {};
+    const monthKey = ts => { const d=new Date(ts); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); };
+    for (const s of sales) {
+      const k = monthKey(s.ts);
+      months[k] = months[k] || { count:0, rev:0, costs:0, exp:0, ts:s.ts };
+      months[k].count++; months[k].rev+=s.sold; months[k].costs+=s.cost+s.shipping;
+    }
+    for (const e of expenses) {
+      const k = monthKey(e.ts);
+      months[k] = months[k] || { count:0, rev:0, costs:0, exp:0, ts:e.ts };
+      months[k].exp+=e.amount;
+    }
+    const keys = Object.keys(months).sort().reverse();
+    document.getElementById('summaryTbody').innerHTML = keys.map(k => {
+      const mo = months[k];
+      const label = new Date(mo.ts).toLocaleDateString('en-GB', { month:'long', year:'numeric' });
+      const np = mo.rev - mo.costs - mo.exp;
+      return `<tr>
+        <td style="font-weight:600">${label}</td><td>${mo.count}</td><td>${gbp(mo.rev)}</td>
+        <td>${gbp(mo.costs)}</td><td class="amber">${gbp(mo.exp)}</td>
+        <td class="${np>=0?'green':'red'}" style="font-weight:700">${gbp(np)}</td>
+      </tr>`;
+    }).join('');
+    document.getElementById('emptySummary').style.display = keys.length ? 'none' : 'block';
+
+    const tyS = sales.filter(s => inPeriod(s.ts,'taxYear'));
+    const turnover = tyS.reduce((a,s) => a+s.sold, 0);
+    const itemCosts = tyS.reduce((a,s) => a+s.cost+s.shipping, 0);
+    const miscExp = expenses.filter(e => inPeriod(e.ts,'taxYear')).reduce((a,e) => a+e.amount, 0);
+    document.getElementById('taxTurnover').textContent = gbp(turnover);
+    document.getElementById('taxCosts').textContent = gbp(itemCosts+miscExp);
+    colourise(document.getElementById('taxProfit'), turnover-itemCosts-miscExp);
+  }
+
+  // ===== CSV EXPORTS =====
+  function downloadCSV(rows, filename) {
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g,'""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type:'text/csv' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = filename; a.click();
+  }
+  function exportSalesCSV() {
+    if (!sales.length) { alert('Nothing to export yet.'); return; }
+    downloadCSV([
+      ['Item','Recipient','SKU','Platform','Cost (£)','Sold For (£)','Shipping (£)','Profit (£)','Date','Time','Edited'],
+      ...sales.map(s => [s.item, s.recipient, s.sku, s.platform, s.cost.toFixed(2), s.sold.toFixed(2), s.shipping.toFixed(2), profit(s).toFixed(2), dayLabel(s.ts), timeLabel(s.ts), s.edited||''])
+    ], 'sales-tracker.csv');
+  }
+  function exportExpensesCSV() {
+    if (!expenses.length) { alert('Nothing to export yet.'); return; }
+    downloadCSV([
+      ['Description','Category','Amount (£)','Date','Time','Edited'],
+      ...expenses.map(e => [e.desc, e.category, e.amount.toFixed(2), dayLabel(e.ts), timeLabel(e.ts), e.edited||''])
+    ], 'misc-expenses.csv');
+  }
+
+  // Enter key shortcuts
+  document.querySelectorAll('#invItem,#invSku,#invCost').forEach(el => el.addEventListener('keydown', e => { if(e.key==='Enter') addStock(); }));
+  document.querySelectorAll('#saleSku,#saleRecipient,#saleSold,#saleShipping').forEach(el => el.addEventListener('keydown', e => { if(e.key==='Enter') addSale(); }));
+  document.querySelectorAll('#expDesc,#expAmount').forEach(el => el.addEventListener('keydown', e => { if(e.key==='Enter') addExpense(); }));
+
+  (async () => {
+    await loadData();
+    renderInventory(); renderSales(); renderExpenses();
+  })();
+</script>
+</body>
+</html>
