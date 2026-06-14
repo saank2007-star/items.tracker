@@ -78,18 +78,17 @@ async function loadFromDrive() {
   if (!oAuth2Client) return null;
   try {
     const drive = google.drive({ version: 'v3', auth: oAuth2Client });
-    if (!driveFileId) {
-      const res = await drive.files.list({
-        q: "name='tracker-data.json' and trashed=false",
-        fields: 'files(id)',
-        pageSize: 1,
-      });
-      if (res.data.files && res.data.files.length > 0) {
-        driveFileId = res.data.files[0].id;
-        fs.writeFileSync(fileIdPath(), driveFileId);
-      } else {
-        return null;
-      }
+    // Always search by name on load to get the latest file (don't rely on cached ID)
+    const listRes = await drive.files.list({
+      q: "name='tracker-data.json' and trashed=false",
+      fields: 'files(id)',
+      pageSize: 1,
+    });
+    if (listRes.data.files && listRes.data.files.length > 0) {
+      driveFileId = listRes.data.files[0].id;
+      fs.writeFileSync(fileIdPath(), driveFileId);
+    } else {
+      return null;
     }
     const res = await drive.files.get({ fileId: driveFileId, alt: 'media' });
     return typeof res.data === 'string' ? JSON.parse(res.data) : res.data;
